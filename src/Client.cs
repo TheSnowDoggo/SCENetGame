@@ -1,20 +1,23 @@
-﻿using System.Net;
+﻿using System.ComponentModel;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using SCENetCore;
 
 namespace SCENetGame;
 
 internal static class Client
 {
-    private const int BufferSize = 1024;
-
     private static Socket _socket;
 
     private static readonly Thread _receiveThread = new(ReceiveThread);
 
     private static readonly ManualResetEvent _receiveDone = new(false);
 
-    public static event Action<string> Receive;
+    public static event Action<string> ReceiveChat;
+
+    public static TextWriter ErrorOut { get; set; } = Console.Out;
+    public static string Username { get; set; }
 
     public static bool TryConnect(string hostName, int port)
     {
@@ -37,13 +40,11 @@ internal static class Client
         }
     }
 
-    public static void Send(string message)
+    public static void Send(byte[] buffer)
     {
         try
         {
-            byte[] buffer = Encoding.UTF8.GetBytes(message);
-
-            if (buffer.Length > BufferSize)
+            if (buffer.Length > Constants.BufferSize)
             {
                 PrintError("Message is too long.");
                 return;
@@ -55,6 +56,11 @@ internal static class Client
         {
             PrintError("Error starting send", ex);
         }
+    }
+
+    public static void SendChat(string text)
+    {
+        Send(Translation.ToBytes(MessageType.Chat, text));
     }
 
     public static void StartReceive()
@@ -82,9 +88,9 @@ internal static class Client
             {
                 _receiveDone.Reset();
 
-                byte[] buffer = new byte[BufferSize];
+                byte[] buffer = new byte[Constants.BufferSize];
 
-                _socket.BeginReceive(buffer, 0, BufferSize, SocketFlags.None, ReceiveCallback, buffer);
+                _socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, buffer);
 
                 _receiveDone.WaitOne();
             }
@@ -104,11 +110,23 @@ internal static class Client
 
             _receiveDone.Set();
 
+            if (receivedBytes == 0)
+            {
+                return;
+            }
+
             var buffer = (byte[])ar.AsyncState;
 
-            string message = Encoding.UTF8.GetString(buffer, 0, receivedBytes);
+            var type = (MessageType)buffer[0];
 
-            Receive?.Invoke(message);
+            switch (type)
+            {
+            case MessageType.Chat:
+                ReceiveChat?.Invoke(Translation.ToString(buffer, receivedBytes));
+                break;
+            default:
+                throw new InvalidEnumArgumentException(nameof(type), (int)type, typeof(MessageType));
+            }
         }
         catch (Exception ex)
         {
@@ -118,7 +136,7 @@ internal static class Client
 
     private static void PrintError(string message)
     {
-        Console.WriteLine($"[ERROR] {message}");
+        ErrorOut.WriteLine($"[ERROR] {message}");
     }
 
     private static void PrintError(string message, Exception ex)

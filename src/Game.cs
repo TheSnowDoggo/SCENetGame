@@ -1,8 +1,9 @@
-﻿using ConsoleUtility;
-using SCENeo;
+﻿using SCENeo;
 using SCENeo.Node;
 using SCENeo.Node.Render;
 using SCENeo.Ui;
+using SCENetCore;
+using System.Net;
 
 namespace SCENetGame;
 
@@ -30,7 +31,7 @@ internal sealed class Game : IRenderSource
         Anchor = Anchor.Right,
     };
 
-    private readonly TextEntryUi _entryUi = new();
+    private readonly ChatBox _chatBox = new ChatBox();
 
     private readonly RenderChannel _rc = new()
     {
@@ -57,7 +58,7 @@ internal sealed class Game : IRenderSource
 
         _canvas.Viewport.Source = new RenderManager()
         {
-            Sources = [this, _entryUi],
+            Sources = [this, _chatBox],
         };
     }
 
@@ -68,22 +69,30 @@ internal sealed class Game : IRenderSource
 
     public void Run()
     {
-        ConnectToServer();
+        if (!Client.TryConnect(Dns.GetHostName(), Constants.DefaultPort))
+        {
+            return;
+        }
 
-        Client.Receive += Client_OnReceive;
+        Console.WriteLine("Connected to server successful!");
+
+        Client.ReceiveChat += Client_OnReceive;
 
         Client.StartReceive();
 
-        Console.CursorVisible = false;
+        SetUsername();
 
-        Console.SetOut(_console);
+        Client.ErrorOut = _console;
+        _chatBox.Out = _console;
+
+        Console.CursorVisible = false;
 
         _updater.Start();
     }
 
     private void Update(double delta)
     {
-        _entryUi.Update(delta);
+        _chatBox.Update(delta);
 
         _fps.Text = $"FPS: {_updater.FPS:0}";
 
@@ -94,7 +103,7 @@ internal sealed class Game : IRenderSource
 
     private void Client_OnReceive(string message)
     {
-        Console.WriteLine($"<server> {message}");
+        _console.WriteLine(message);
     }
 
     private static void ConnectToServer()
@@ -137,6 +146,33 @@ internal sealed class Game : IRenderSource
             {
                 continue;
             }
+
+            return;
+        }
+    }
+
+    private static void SetUsername()
+    {
+        while (true)
+        {
+            Console.Write("Enter username: ");
+            string username = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                Console.WriteLine("Input was empty.");
+                continue;
+            }
+
+            if (username.Length is < 3 or > 16)
+            {
+                Console.WriteLine("Username must be between 3-16 characters.");
+                continue;
+            }
+
+            Client.Send(Translation.ToBytes(MessageType.GiveUser, username));
+
+            Client.Username = username;
 
             return;
         }

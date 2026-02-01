@@ -1,10 +1,9 @@
 ﻿using SCENeo;
 using SCENeo.Ui;
-using System.Diagnostics;
 
 namespace SCENetGame;
 
-internal sealed class TextEntryUi : IRenderSource
+internal sealed class ChatBox : IRenderSource
 {
     private const int MaxCharacters = 60;
 
@@ -33,7 +32,7 @@ internal sealed class TextEntryUi : IRenderSource
 
     private double _blinkTimer;
 
-    public TextEntryUi()
+    public ChatBox()
     {
         _overlay = new VirtualOverlay()
         {
@@ -48,6 +47,8 @@ internal sealed class TextEntryUi : IRenderSource
 
         SetPreText();
     }
+
+    public TextWriter Out { get; set; }
 
     public void Update(double delta)
     {
@@ -76,9 +77,9 @@ internal sealed class TextEntryUi : IRenderSource
     {
         string text = _entry.Text;
 
-        Client.Send(text);
+        Client.SendChat(text);
 
-        Console.WriteLine($"<you> {text}");
+        Out.WriteLine($"<{Client.Username}> {text}");
 
         _entry.Clear();
     }

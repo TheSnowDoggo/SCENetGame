@@ -16,6 +16,9 @@
     <Reference Include="ConsoleUtility">
       <HintPath>lib\ConsoleUtility.dll</HintPath>
     </Reference>
+    <Reference Include="SCENetCore">
+      <HintPath>..\SCENetCore\bin\Release\net9.0\SCENetCore.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

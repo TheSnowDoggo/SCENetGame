@@ -1,6 +1,5 @@
 ﻿using SCENeo;
 using SCENeo.Ui;
-using SCEWin;
 
 namespace SCENetGame;
 
@@ -13,7 +12,7 @@ internal sealed class Canvas
         _display = new Display()
         {
             Renderable = Viewport,
-            Output = WinOutput.Instance,
+            Output = ConsoleOutput.Instance,
         };
 
         _display.OnResize += Display_OnResize;
