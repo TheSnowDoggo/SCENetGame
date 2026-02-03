@@ -24,9 +24,7 @@ internal static class Client
     {
         try
         {
-            IPHostEntry hostEntry = Dns.GetHostEntry(hostName);
-
-            IPAddress ip = hostEntry.AddressList[0];
+            IPAddress ip = Dns.GetHostAddresses(hostName)[0];
 
             var endPoint = new IPEndPoint(ip, port);
 
