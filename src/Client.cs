@@ -10,11 +10,12 @@ internal static class Client
 {
     private static Socket _socket;
 
-    private static readonly Thread _receiveThread = new(ReceiveThread);
+    private static readonly Thread ReceiveThread = new(Receive);
 
-    private static readonly ManualResetEvent _receiveDone = new(false);
+    private static readonly ManualResetEvent ReceiveDone = new(false);
 
     public static event Action<string> ReceiveChat;
+    public static event Action OnDisconnect;
 
     public static TextWriter ErrorOut { get; set; } = Console.Out;
     public static string Username { get; set; }
@@ -63,36 +64,36 @@ internal static class Client
         Send(Translation.ToBytes(MessageType.Chat, text));
     }
 
-    public static void StartReceive()
+    public static void StartReceiveThread()
     {
-        _receiveThread.Start();
+        ReceiveThread.Start();
     }
 
     private static void SendCallback(IAsyncResult result)
     {
         try
         {
-            int sentBytes = _socket.EndSend(result);
+            _socket.EndSend(result);
         }
         catch (Exception ex)
         {
-            PrintError("Faileed to send", ex);
+            PrintError("Failed to send", ex);
         }
     }
 
-    private static void ReceiveThread()
+    private static void Receive()
     {
-        while (true)
+        byte[] buffer = new byte[Constants.BufferSize];
+        
+        while (_socket.Connected)
         {
             try
             {
-                _receiveDone.Reset();
-
-                byte[] buffer = new byte[Constants.BufferSize];
+                ReceiveDone.Reset();
 
                 _socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, buffer);
 
-                _receiveDone.WaitOne();
+                ReceiveDone.WaitOne();
             }
             catch (Exception ex)
             {
@@ -108,14 +109,15 @@ internal static class Client
         {
             int receivedBytes = _socket.EndReceive(ar);
 
-            _receiveDone.Set();
+            ReceiveDone.Set();
 
-            if (receivedBytes == 0)
+            if (ar.AsyncState == null)
             {
+                PrintError("State was null.");
                 return;
             }
 
-            var buffer = (byte[])ar.AsyncState;
+            byte[] buffer = (byte[])ar.AsyncState;
 
             var type = (MessageType)buffer[0];
 
@@ -125,13 +127,29 @@ internal static class Client
                 ReceiveChat?.Invoke(Translation.ToString(buffer, receivedBytes));
                 break;
             default:
-                throw new InvalidEnumArgumentException(nameof(type), (int)type, typeof(MessageType));
+                PrintError($"Unknown message type: {type}.");
+                return;
             }
         }
         catch (Exception ex)
         {
+            ReceiveDone.Set();
+
+            if (!_socket.Connected)
+            {
+                HandleDisconnected();
+                return;
+            }
+            
             PrintError("Failed to receive data", ex);
         }
+    }
+
+    private static void HandleDisconnected()
+    {
+        ErrorOut.WriteLine("Disconnected from server.");
+        
+        OnDisconnect?.Invoke();
     }
 
     private static void PrintError(string message)

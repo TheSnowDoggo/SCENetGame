@@ -69,16 +69,15 @@ internal sealed class Game : IRenderSource
 
     public void Run()
     {
-        if (!Client.TryConnect(Dns.GetHostName(), Constants.DefaultPort))
-        {
-            return;
-        }
+        Console.WriteLine($"Hint: {Dns.GetHostName()}");
+        
+        ConnectToServer();
 
         Console.WriteLine("Connected to server successful!");
 
         Client.ReceiveChat += Client_OnReceive;
 
-        Client.StartReceive();
+        Client.StartReceiveThread();
 
         SetUsername();
 
@@ -136,11 +135,13 @@ internal sealed class Game : IRenderSource
 
             if (port is < 0 or > 65535)
             {
-                Console.WriteLine("Port must be betweeen 0-65535.");
+                Console.WriteLine("Port must be between 0-65535.");
                 continue;
             }
 
             string hostName = input[..delimiter];
+
+            Console.WriteLine($"Host: {hostName} Port: {port}");
 
             if (!Client.TryConnect(hostName, port))
             {
@@ -170,7 +171,7 @@ internal sealed class Game : IRenderSource
                 continue;
             }
 
-            Client.Send(Translation.ToBytes(MessageType.GiveUser, username));
+            Client.Send(Translation.ToBytes(MessageType.SetUsername, username));
 
             Client.Username = username;
 
