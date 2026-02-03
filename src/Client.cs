@@ -24,11 +24,13 @@ internal static class Client
     {
         try
         {
-            IPAddress[] addresses = Dns.GetHostAddresses(hostName);
+            IPHostEntry hostEntry = Dns.GetHostEntry(hostName);
 
-            var endPoint = new IPEndPoint(addresses[0], port);
+            IPAddress ip = hostEntry.AddressList[0];
 
-            _socket = new Socket(addresses[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            var endPoint = new IPEndPoint(ip, port);
+
+            _socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
             _socket.Connect(endPoint);
 
