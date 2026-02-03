@@ -4,6 +4,7 @@ using SCENeo.Node.Render;
 using SCENeo.Ui;
 using SCENetCore;
 using System.Net;
+using System.Text;
 
 namespace SCENetGame;
 
@@ -69,19 +70,20 @@ internal sealed class Game : IRenderSource
 
     public void Run()
     {
-        Console.WriteLine($"Hint: {Dns.GetHostName()}");
-        
         ConnectToServer();
 
-        Console.WriteLine("Connected to server successful!");
+        Console.WriteLine("Establish server socket.");
+
+        string username = ReadUsername();
+
+        Client.Send(Translation.ToBytes(MessageType.User, username));
 
         Client.ReceiveChat += Client_OnReceive;
 
         Client.StartReceiveThread();
 
-        SetUsername();
+        Logging.ConsoleOut = _console;
 
-        Client.ErrorOut = _console;
         _chatBox.Out = _console;
 
         Console.CursorVisible = false;
@@ -141,8 +143,6 @@ internal sealed class Game : IRenderSource
 
             string hostName = input[..delimiter];
 
-            Console.WriteLine($"Host: {hostName} Port: {port}");
-
             if (!Client.TryConnect(hostName, port))
             {
                 continue;
@@ -152,7 +152,7 @@ internal sealed class Game : IRenderSource
         }
     }
 
-    private static void SetUsername()
+    private static string ReadUsername()
     {
         while (true)
         {
@@ -171,11 +171,7 @@ internal sealed class Game : IRenderSource
                 continue;
             }
 
-            Client.Send(Translation.ToBytes(MessageType.SetUsername, username));
-
-            Client.Username = username;
-
-            return;
+            return username;
         }
     }
 }

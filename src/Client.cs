@@ -1,18 +1,23 @@
-﻿using System.ComponentModel;
+﻿using SCENeo.Node.Collision;
+using SCENetCore;
+using System;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using SCENetCore;
 
 namespace SCENetGame;
 
 internal static class Client
 {
+    //private const int MaxArraysPerBucket = 8;
+
     private static Socket _socket;
 
-    private static readonly Thread ReceiveThread = new(Receive);
+    private static readonly Thread _receiveThreaed = new(Receive);
 
-    private static readonly ManualResetEvent ReceiveDone = new(false);
+    private static readonly ManualResetEvent _receiveDone = new(false);
+
+    //private static readonly ArrayPool<byte> _buffers = ArrayPool<byte>.Create(Constants.BufferSize, MaxArraysPerBucket);
 
     public static event Action<string> ReceiveChat;
     public static event Action OnDisconnect;
@@ -66,7 +71,7 @@ internal static class Client
 
     public static void StartReceiveThread()
     {
-        ReceiveThread.Start();
+        _receiveThreaed.Start();
     }
 
     private static void SendCallback(IAsyncResult result)
@@ -89,11 +94,11 @@ internal static class Client
         {
             try
             {
-                ReceiveDone.Reset();
+                _receiveDone.Reset();
 
                 _socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, buffer);
 
-                ReceiveDone.WaitOne();
+                _receiveDone.WaitOne();
             }
             catch (Exception ex)
             {
@@ -105,35 +110,19 @@ internal static class Client
 
     private static void ReceiveCallback(IAsyncResult ar)
     {
+        byte[] buffer = (byte[])ar.AsyncState;
+
         try
         {
-            int receivedBytes = _socket.EndReceive(ar);
+            int received = _socket.EndReceive(ar);
 
-            ReceiveDone.Set();
+            _receiveDone.Set();
 
-            if (ar.AsyncState == null)
-            {
-                PrintError("State was null.");
-                return;
-            }
-
-            byte[] buffer = (byte[])ar.AsyncState;
-
-            var type = (MessageType)buffer[0];
-
-            switch (type)
-            {
-            case MessageType.Chat:
-                ReceiveChat?.Invoke(Translation.ToString(buffer, receivedBytes));
-                break;
-            default:
-                PrintError($"Unknown message type: {type}.");
-                return;
-            }
+            HandleReceive(buffer, received);
         }
         catch (Exception ex)
         {
-            ReceiveDone.Set();
+            _receiveDone.Set();
 
             if (!_socket.Connected)
             {
@@ -143,6 +132,35 @@ internal static class Client
             
             PrintError("Failed to receive data", ex);
         }
+    }
+
+    private static void HandleReceive(byte[] buffer, int received)
+    {
+        var type = (MessageType)buffer[0];
+
+        switch (type)
+        {
+        case MessageType.Accept:
+            OnAccept(Translation.ToString(buffer, received));
+            break;
+        case MessageType.Chat:
+            ReceiveChat?.Invoke(Translation.ToString(buffer, received));
+            break;
+        default:
+            PrintError($"Unknown message type: {type}.");
+            break;
+        }
+    }
+
+    private static void OnAccept(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            PrintError("Accept username was blank.");
+            return;
+        }
+
+        Username = message;
     }
 
     private static void HandleDisconnected()
