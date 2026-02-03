@@ -30,7 +30,7 @@ internal static class Client
 
             var endPoint = new IPEndPoint(ip, port);
 
-            _socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _socket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
             _socket.Connect(endPoint);
 
